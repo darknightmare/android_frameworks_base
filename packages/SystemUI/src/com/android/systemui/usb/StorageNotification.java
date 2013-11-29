@@ -22,6 +22,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
+import android.hardware.usb.UsbManager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -60,6 +61,7 @@ public class StorageNotification extends SystemUI {
     private Notification   mMediaStorageNotification;
     private boolean        mUmsAvailable;
     private StorageManager mStorageManager;
+    private UsbManager     mUsbManager;
 
     private Handler        mAsyncEventHandler;
 
@@ -86,6 +88,7 @@ public class StorageNotification extends SystemUI {
     @Override
     public void start() {
         mStorageManager = (StorageManager) mContext.getSystemService(Context.STORAGE_SERVICE);
+        mUsbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
         final boolean connected = mStorageManager.isUsbMassStorageConnected();
         if (DEBUG) Log.d(TAG, String.format( "Startup with UMS connection %s (media state %s)",
                 mUmsAvailable, Environment.getExternalStorageState()));
@@ -117,6 +120,10 @@ public class StorageNotification extends SystemUI {
              */
             connected = false;
         }
+        //once UMS connected and SD card mounted, enable UMS
+        if (connected && st.equals(Environment.MEDIA_MOUNTED)) {
+            mStorageManager.setUsbMassStorageEnabled(true);
+        }
         updateUsbMassStorageNotification(connected);
     }
 
@@ -126,6 +133,10 @@ public class StorageNotification extends SystemUI {
                 "Media {%s} state changed from {%s} -> {%s} (primary = %b)", path, oldState,
                 newState, isPrimary));
         if (newState.equals(Environment.MEDIA_SHARED)) {
+            if (!mUsbManager.isFunctionEnabled(UsbManager.USB_FUNCTION_MASS_STORAGE)) {
+                mStorageManager.disableUsbMassStorage();
+            }
+
             /*
              * Storage is now shared. Modify the UMS notification
              * for stopping UMS.
