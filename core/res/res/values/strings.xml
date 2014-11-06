@@ -2369,6 +2369,9 @@
     <!-- Shown in the lock screen when there is SIM card IO error. -->
     <string name="lockscreen_sim_error_message_short">Invalid card.</string>
 
+    <string name="multi_sim_entry_format_no_carrier" translatable="false">SIM - <xliff:g id="index">%1$d</xliff:g></string>
+    <string name="multi_sim_entry_format" translatable="false"><xliff:g id="operator">%1$s</xliff:g> - <xliff:g id="index">%2$d</xliff:g></string>
+
     <!-- When the user inserts a sim card from an unsupported network, it becomes network
          locked -->
     <string name="lockscreen_network_locked_message">Network locked</string>
