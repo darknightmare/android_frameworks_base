@@ -109,6 +109,23 @@ public class MSimSignalClusterView extends LinearLayout
 
     public MSimSignalClusterView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+        mMobileStrengthId = new int[mNumPhones];
+        mMobileDescription = new String[mNumPhones];
+        mMobileTypeId = new int[mNumPhones];
+        mMobileActivityId = new int[mNumPhones];
+        mNoSimIconId = new int[mNumPhones];
+        mMobileGroup = new ViewGroup[mNumPhones];
+        mNoSimSlot = new ImageView[mNumPhones];
+        mMobileSlot = new TextView[mNumPhones];
+        mMobile = new ImageView[mNumPhones];
+        mMobileActivity = new ImageView[mNumPhones];
+        mMobileType = new ImageView[mNumPhones];
+        for(int i=0; i < mNumPhones; i++) {
+            mMobileStrengthId[i] = 0;
+            mMobileTypeId[i] = 0;
+            mMobileActivityId[i] = 0;
+            mNoSimIconId[i] = 0;
+        }
         mHandler = new Handler();
         mDSBDuration = context.getResources().getInteger(R.integer.dsb_transition_duration);
         BarBackgroundUpdater.addListener(new BarBackgroundUpdater.UpdateListener(this) {
@@ -183,22 +200,6 @@ public class MSimSignalClusterView extends LinearLayout
 
         });
         return animator;
-        mMobileStrengthId = new int[mNumPhones];
-        mMobileDescription = new String[mNumPhones];
-        mMobileTypeId = new int[mNumPhones];
-        mMobileActivityId = new int[mNumPhones];
-        mNoSimIconId = new int[mNumPhones];
-        mMobileGroup = new ViewGroup[mNumPhones];
-        mMobileSlot = new TextView[mNumPhones];
-        mMobile = new ImageView[mNumPhones];
-        mMobileActivity = new ImageView[mNumPhones];
-        mMobileType = new ImageView[mNumPhones];
-        for(int i=0; i < mNumPhones; i++) {
-            mMobileStrengthId[i] = 0;
-            mMobileTypeId[i] = 0;
-            mMobileActivityId[i] = 0;
-            mNoSimIconId[i] = 0;
-        }
     }
 
     public void setNetworkController(MSimNetworkController nc) {
