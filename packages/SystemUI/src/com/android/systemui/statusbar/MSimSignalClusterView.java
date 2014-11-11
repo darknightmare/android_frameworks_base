@@ -18,7 +18,6 @@
 
 package com.android.systemui.statusbar;
 
-import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
@@ -26,7 +25,6 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
-import android.graphics.PorterDuff;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.util.Slog;
@@ -47,7 +45,8 @@ import com.android.systemui.R;
 import java.util.ArrayList;
 
 // Intimately tied to the design of res/layout/msim_signal_cluster_view.xml
-public class MSimSignalClusterView extends LinearLayout
+public class MSimSignalClusterView
+        extends LinearLayout
         implements MSimNetworkController.MSimSignalCluster {
 
     static final boolean DEBUG = false;
@@ -126,6 +125,7 @@ public class MSimSignalClusterView extends LinearLayout
             mMobileActivityId[i] = 0;
             mNoSimIconId[i] = 0;
         }
+
         mHandler = new Handler();
         mDSBDuration = context.getResources().getInteger(R.integer.dsb_transition_duration);
         BarBackgroundUpdater.addListener(new BarBackgroundUpdater.UpdateListener(this) {
@@ -136,22 +136,43 @@ public class MSimSignalClusterView extends LinearLayout
                 mPreviousOverrideIconColor = previousIconColor;
                 mOverrideIconColor = iconColor;
 
+                final ArrayList<ImageView> imageViews = new ArrayList<ImageView>();
+                for (final ImageView iv : new ImageView[] {
+                        mWifi, mWifiActivity, mAirplane }) {
+                    imageViews.add(iv);
+                }
+                for (final ImageView[] ivs : new ImageView[][] {
+                    mNoSimSlot, mMobile, mMobileActivity, mMobileType }) {
+                    if (ivs != null) {
+                        for (final ImageView iv : ivs) {
+                            imageViews.add(iv);
+                        }
+                    }
+                }
+
+                final ArrayList<TextView> textViews = new ArrayList<TextView>();
+                if (mMobileSlot != null) {
+                    for (final TextView tv : mMobileSlot) {
+                        textViews.add(tv);
+                    }
+                }
+
                 if (mOverrideIconColor == 0) {
                     mHandler.post(new Runnable() {
 
                         @Override
                         public void run() {
-                            if (mWifi != null) {
-                                mWifi.setColorFilter(null);
+                            for (final ImageView iv : imageViews) {
+                                if (iv != null) {
+                                    iv.setColorFilter(null);
+                                }
                             }
-                            if (mMobile != null) {
-                                mMobile.setColorFilter(null);
-                            }
-                            if (mMobileType != null) {
-                                mMobileType.setColorFilter(null);
-                            }
-                            if (mAirplane != null) {
-                                mAirplane.setColorFilter(null);
+
+                            for (final TextView tv : textViews) {
+                                if (tv != null) {
+                                    // TODO fix the hardcoded value
+                                    tv.setTextColor(0xFFFFFFFF);
+                                }
                             }
                         }
 
@@ -159,19 +180,48 @@ public class MSimSignalClusterView extends LinearLayout
 
                     return null;
                 } else {
-                    final ArrayList<Animator> anims = new ArrayList<Animator>();
+                    final ArrayList<ObjectAnimator> anims = new ArrayList<ObjectAnimator>();
 
-                    if (mWifi != null) {
-                        anims.add(buildAnimator(mWifi));
+                    for (final ImageView iv : imageViews) {
+                        if (iv == null) {
+                            continue;
+                        }
+
+                        final ObjectAnimator animator = ObjectAnimator.ofObject(iv, "colorFilter",
+                                new ArgbEvaluator(), mPreviousOverrideIconColor,
+                                mOverrideIconColor);
+                        animator.setDuration(mDSBDuration);
+                        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+
+                            @Override
+                            public void onAnimationUpdate(final ValueAnimator anim) {
+                                iv.invalidate();
+                            }
+
+                        });
+
+                        anims.add(animator);
                     }
-                    if (mMobile != null) {
-                        anims.add(buildAnimator(mMobile));
-                    }
-                    if (mMobileType != null) {
-                        anims.add(buildAnimator(mMobileType));
-                    }
-                    if (mAirplane != null) {
-                        anims.add(buildAnimator(mAirplane));
+
+                    for (final TextView tv : textViews) {
+                        if (tv == null) {
+                            continue;
+                        }
+
+                        final ObjectAnimator animator = ObjectAnimator.ofObject(tv, "textColor",
+                                new ArgbEvaluator(), mPreviousOverrideIconColor,
+                                mOverrideIconColor);
+                        animator.setDuration(mDSBDuration);
+                        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+
+                            @Override
+                            public void onAnimationUpdate(final ValueAnimator anim) {
+                                tv.invalidate();
+                            }
+
+                        });
+
+                        anims.add(animator);
                     }
 
                     if (anims.isEmpty()) {
@@ -185,21 +235,6 @@ public class MSimSignalClusterView extends LinearLayout
             }
 
         });
-    }
-
-    private ObjectAnimator buildAnimator(final ImageView target) {
-        final ObjectAnimator animator = ObjectAnimator.ofObject(target, "colorFilter",
-                new ArgbEvaluator(), mPreviousOverrideIconColor, mOverrideIconColor);
-        animator.setDuration(mDSBDuration);
-        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-
-            @Override
-            public void onAnimationUpdate(final ValueAnimator anim) {
-                target.invalidate();
-            }
-
-        });
-        return animator;
     }
 
     public void setNetworkController(MSimNetworkController nc) {
@@ -338,5 +373,5 @@ public class MSimSignalClusterView extends LinearLayout
     public void setStyle(int style) {
         mSignalClusterStyle = style;
     }
-
 }
+
