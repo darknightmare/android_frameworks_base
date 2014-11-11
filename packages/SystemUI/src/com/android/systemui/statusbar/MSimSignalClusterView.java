@@ -18,6 +18,7 @@
 
 package com.android.systemui.statusbar;
 
+import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
@@ -180,7 +181,7 @@ public class MSimSignalClusterView
 
                     return null;
                 } else {
-                    final ArrayList<ObjectAnimator> anims = new ArrayList<ObjectAnimator>();
+                    final ArrayList<Animator> anims = new ArrayList<Animator>();
 
                     for (final ImageView iv : imageViews) {
                         if (iv == null) {
