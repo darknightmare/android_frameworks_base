@@ -136,13 +136,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
     protected boolean mAirplaneMode = false;
     protected boolean mLastAirplaneMode = true;
 
-    protected Locale mLocale = null;
-    protected Locale mLastLocale = null;
-
-    //ethernet
-    private boolean mEthernetConnected = false;
-    protected int mEthernetIconId = 0;
-    protected int mLastEthernetIconId = 0;
+    private Locale mLocale = null;
+    private Locale mLastLocale = null;
 
     // our ui
     protected Context mContext;
@@ -165,7 +160,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
 
     boolean mDataAndWifiStacked = false;
 
-    protected UpdateUIListener mUpdateUIListener = null;
+    private UpdateUIListener mUpdateUIListener = null;
 
     public interface SignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon,

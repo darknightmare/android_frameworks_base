@@ -28,22 +28,31 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.net.wimax.WimaxManagerConstants;
+import android.os.Binder;
 import android.os.Handler;
 import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
 import android.os.SystemProperties;
+import android.provider.Settings;
+import android.provider.Telephony;
 import android.telephony.MSimTelephonyManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Slog;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.cdma.EriInfo;
+import com.android.internal.util.AsyncChannel;
 
 import com.android.systemui.R;
 
@@ -73,7 +82,7 @@ public class MSimNetworkController extends NetworkController {
     int[] mMSimDataTypeIconId;
     int[] mNoMSimIconId;
     int[] mMSimMobileActivityIconId; // overlay arrows for data direction
-    int[] mMSimLastCombinedActivityIconId;
+
     String[] mMSimContentDescriptionPhoneSignal;
     String[] mMSimContentDescriptionCombinedSignal;
     String[] mMSimContentDescriptionDataType;
@@ -94,9 +103,8 @@ public class MSimNetworkController extends NetworkController {
     ArrayList<TextView> mSubsLabelViews = new ArrayList<TextView>();
 
     public interface MSimSignalCluster {
-        void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
-                String contentDescription);
-        void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
+        void setWifiIndicators(boolean visible, int strengthIcon, String contentDescription);
+        void setMobileDataIndicators(boolean visible, int strengthIcon,
                 int typeIcon, String contentDescription, String typeContentDescription,
                 int noSimIcon, int subscription);
         void setIsAirplaneMode(boolean is, int airplaneIcon);
@@ -130,7 +138,6 @@ public class MSimNetworkController extends NetworkController {
         mMSimLastCombinedSignalIconId = new int[numPhones];
         mMSimcombinedSignalIconId = new int[numPhones];
         mMSimcombinedActivityIconId = new int[numPhones];
-        mMSimLastCombinedActivityIconId = new int[numPhones];
         mMSimDataActivity = new int[numPhones];
         mMSimContentDescriptionCombinedSignal = new String[numPhones];
         mMSimContentDescriptionDataType = new String[numPhones];
@@ -154,7 +161,6 @@ public class MSimNetworkController extends NetworkController {
             mMSimLastCombinedSignalIconId[i] = -1;
             mMSimcombinedSignalIconId[i] = 0;
             mMSimcombinedActivityIconId[i] = 0;
-            mMSimLastCombinedActivityIconId[i] = 0;
             mMSimDataActivity[i] = TelephonyManager.DATA_ACTIVITY_NONE;
             mMSimLastSimIconId[i] = 0;
             mMSimNetworkName[i] = mNetworkNameDefault;
@@ -217,12 +223,10 @@ public class MSimNetworkController extends NetworkController {
                 // only show wifi in the cluster if connected or if wifi-only
                 mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature),
                 mWifiIconId,
-                mWifiActivityIconId,
                 mContentDescriptionWifi);
         cluster.setMobileDataIndicators(
                 mHasMobileDataFeature,
                 mMSimPhoneSignalIconId[subscription],
-                mMSimMobileActivityIconId[subscription],
                 mMSimDataTypeIconId[subscription],
                 mMSimContentDescriptionPhoneSignal[subscription],
                 mMSimContentDescriptionDataType[subscription],
@@ -232,7 +236,6 @@ public class MSimNetworkController extends NetworkController {
             cluster.setMobileDataIndicators(
                     true,
                     mAlwaysShowCdmaRssi ? mPhoneSignalIconId : mWimaxIconId,
-                    mMSimMobileActivityIconId[subscription],
                     mMSimDataTypeIconId[subscription],
                     mContentDescriptionWimax,
                     mMSimContentDescriptionDataType[subscription],
@@ -243,7 +246,6 @@ public class MSimNetworkController extends NetworkController {
                     mHasMobileDataFeature,
                     mShowPhoneRSSIForData ? mMSimPhoneSignalIconId[subscription]
                         : mMSimDataSignalIconId[subscription],
-                    mMSimMobileActivityIconId[subscription],
                     mMSimDataTypeIconId[subscription],
                     mMSimContentDescriptionPhoneSignal[subscription],
                     mMSimContentDescriptionDataType[subscription],
@@ -999,20 +1001,7 @@ public class MSimNetworkController extends NetworkController {
             // Now for things that should only be shown when actually using mobile data.
             if (mMSimDataConnected[subscription]) {
                 mMSimcombinedSignalIconId[subscription] = mMSimDataSignalIconId[subscription];
-                switch (mMSimDataActivity[subscription]) {
-                    case TelephonyManager.DATA_ACTIVITY_IN:
-                        mMSimMobileActivityIconId[subscription] = R.drawable.stat_sys_signal_in;
-                        break;
-                    case TelephonyManager.DATA_ACTIVITY_OUT:
-                        mMSimMobileActivityIconId[subscription] = R.drawable.stat_sys_signal_out;
-                        break;
-                    case TelephonyManager.DATA_ACTIVITY_INOUT:
-                        mMSimMobileActivityIconId[subscription] = R.drawable.stat_sys_signal_inout;
-                        break;
-                    default:
-                        mMSimMobileActivityIconId[subscription] = R.drawable.stat_sys_signal_noinout;
-                        break;
-                }
+
                 combinedLabel = mobileLabel;
                 mMSimcombinedActivityIconId[subscription] = mMSimMobileActivityIconId[subscription];
                 // set by updateDataIcon()
@@ -1028,29 +1017,13 @@ public class MSimNetworkController extends NetworkController {
             if (mWifiSsid == null) {
                 wifiLabel = context.getString(
                         R.string.status_bar_settings_signal_meter_wifi_nossid);
-                mWifiActivityIconId = 0; // no wifis, no bits
             } else {
                 wifiLabel = mWifiSsid;
                 if (DEBUG) {
                     wifiLabel += "xxxxXXXXxxxxXXXX";
                 }
-                switch (mWifiActivity) {
-                    case WifiManager.DATA_ACTIVITY_IN:
-                        mWifiActivityIconId = R.drawable.stat_sys_wifi_in;
-                        break;
-                    case WifiManager.DATA_ACTIVITY_OUT:
-                        mWifiActivityIconId = R.drawable.stat_sys_wifi_out;
-                        break;
-                    case WifiManager.DATA_ACTIVITY_INOUT:
-                        mWifiActivityIconId = R.drawable.stat_sys_wifi_inout;
-                        break;
-                    case WifiManager.DATA_ACTIVITY_NONE:
-                        mWifiActivityIconId = R.drawable.stat_sys_wifi_noinout;
-                        break;
-                }
             }
             combinedLabel = wifiLabel;
-            mMSimcombinedActivityIconId[subscription] = mWifiActivityIconId;
             mMSimcombinedSignalIconId[subscription] = mWifiIconId; // set by updateWifiIcons()
             mMSimContentDescriptionCombinedSignal[subscription] = mContentDescriptionWifi;
         } else {
@@ -1072,8 +1045,8 @@ public class MSimNetworkController extends NetworkController {
         final boolean ethernetConnected = (mConnectedNetworkType ==
                 ConnectivityManager.TYPE_ETHERNET);
         if (ethernetConnected) {
-            mContentDescriptionEthernet = combinedLabel = mContext.getString(
-                    R.string.ethernet_label);
+            // TODO: icons and strings for Ethernet connectivity
+            combinedLabel = mConnectedNetworkTypeName;
         }
 
         if (mAirplaneMode &&
@@ -1196,9 +1169,7 @@ public class MSimNetworkController extends NetworkController {
          || mLastWimaxIconId                != mWimaxIconId
          || mMSimLastDataTypeIconId[subscription] != mMSimDataTypeIconId[subscription]
          || mLastAirplaneMode               != mAirplaneMode
-         || mMSimLastSimIconId[subscription] != mNoMSimIconId[subscription]
-         || mMSimLastCombinedActivityIconId[subscription]
-                != mMSimcombinedActivityIconId[subscription])
+         || mMSimLastSimIconId[subscription] != mNoMSimIconId[subscription])
         {
             // NB: the mLast*s will be updated later
             for (MSimSignalCluster cluster : mSimSignalClusters) {
@@ -1208,10 +1179,6 @@ public class MSimNetworkController extends NetworkController {
 
         if (mLastAirplaneMode != mAirplaneMode) {
             mLastAirplaneMode = mAirplaneMode;
-        }
-
-        if (mLastLocale != mLocale) {
-            mLastLocale = mLocale;
         }
 
         // the phone icon on phones
@@ -1242,24 +1209,13 @@ public class MSimNetworkController extends NetworkController {
                 mMSimcombinedSignalIconId[subscription]) {
             mMSimLastCombinedSignalIconId[subscription] = mMSimcombinedSignalIconId[subscription];
         }
-        // the combined data activity icon
-        if (mMSimLastCombinedActivityIconId[subscription] !=
-                mMSimcombinedActivityIconId[subscription]) {
-            mMSimLastCombinedActivityIconId[subscription]
-                    = mMSimcombinedActivityIconId[subscription];
-        }
-
-        // the ethernet icon
-        if (mLastEthernetIconId != mEthernetIconId) {
-            mLastEthernetIconId = mEthernetIconId;
-        }
 
         // the data network type overlay
         if (mMSimLastDataTypeIconId[subscription] != mMSimDataTypeIconId[subscription]) {
             mMSimLastDataTypeIconId[subscription] = mMSimDataTypeIconId[subscription];
         }
 
-        // the combinedLabel in the notification panel
+      // the combinedLabel in the notification panel
         if (!mLastCombinedLabel.equals(combinedLabel)) {
             mLastCombinedLabel = combinedLabel;
             N = mCombinedLabelViews.size();
@@ -1292,23 +1248,6 @@ public class MSimNetworkController extends NetworkController {
             } else {
                 v.setVisibility(View.VISIBLE);
             }
-        }
-
-        // e-call label
-        N = mEmergencyLabelViews.size();
-        for (int i=0; i<N; i++) {
-            TextView v = mEmergencyLabelViews.get(i);
-            if (!mMSimServiceState[subscription].isEmergencyOnly()) {
-                v.setVisibility(View.GONE);
-            } else {
-                v.setText(mobileLabel); // comes from the telephony stack
-                v.setVisibility(View.VISIBLE);
-            }
-        }
-
-        // Update the dependency UI
-        if (mUpdateUIListener != null) {
-            mUpdateUIListener.onUpdateUI();
         }
     }
 
