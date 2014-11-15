@@ -115,7 +115,6 @@ public class MSimSignalClusterView
         mMobileActivityId = new int[mNumPhones];
         mNoSimIconId = new int[mNumPhones];
         mMobileGroup = new ViewGroup[mNumPhones];
-        mNoSimSlot = new ImageView[mNumPhones];
         mMobileSlot = new TextView[mNumPhones];
         mMobile = new ImageView[mNumPhones];
         mMobileActivity = new ImageView[mNumPhones];
@@ -143,7 +142,7 @@ public class MSimSignalClusterView
                     imageViews.add(iv);
                 }
                 for (final ImageView[] ivs : new ImageView[][] {
-                    mNoSimSlot, mMobile, mMobileActivity, mMobileType }) {
+                    mMobile, mMobileActivity, mMobileType }) {
                     if (ivs != null) {
                         for (final ImageView iv : ivs) {
                             imageViews.add(iv);
